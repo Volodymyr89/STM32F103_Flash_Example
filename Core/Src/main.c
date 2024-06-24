@@ -18,16 +18,29 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "stm32f1xx_hal_flash.h"
 
+#define LAST_PAGE_ADDRESS    (uint32_t) 0x0800FC00
+#define DATA                 (uint32_t) 0x5FFFFF0F
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 
+void blink (void)
+{
+   LL_GPIO_SetOutputPin(GPIOC, LL_GPIO_PIN_13);
+	 LL_mDelay(100);
+   LL_GPIO_ResetOutputPin(GPIOC, LL_GPIO_PIN_13);
+	 LL_mDelay(200);
+}
+
+uint32_t data = 0;
+uint32_t *read_addr = (uint32_t *)LAST_PAGE_ADDRESS;
+
 int main(void)
 {
-
-
+ 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_AFIO);
   LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_PWR);
@@ -48,15 +61,29 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
 
+  FLASH_EraseInitTypeDef EraseInitStruct; // set erase struct
+  HAL_FLASH_Unlock(); // unlock flash to work with
+
+  // fill erase struct
+  EraseInitStruct.PageAddress = LAST_PAGE_ADDRESS;
+  EraseInitStruct.TypeErase = FLASH_TYPEERASE_PAGES;
+  EraseInitStruct.NbPages = 1;
+  uint32_t PageError;
+
+  if (HAL_FLASHEx_Erase(&EraseInitStruct, &PageError) != HAL_OK){		//Erase the Page Before a Write Operation
+			return HAL_ERROR;
+  }
+  HAL_FLASH_Program(TYPEPROGRAM_WORD, LAST_PAGE_ADDRESS, DATA); // program flash
+  HAL_FLASH_Lock(); // lock flash back
+
+  data = *read_addr; // read result back
 
   /* Infinite loop */
 
   while (1)
   {
-   LL_GPIO_SetOutputPin(GPIOC, LL_GPIO_PIN_13);
-	 LL_mDelay(100);
-   LL_GPIO_ResetOutputPin(GPIOC, LL_GPIO_PIN_13);
-	 LL_mDelay(200);
+    // simple blink to veify everithing running
+    blink();
 
   }
 
@@ -99,6 +126,12 @@ void SystemClock_Config(void)
   }
   LL_Init1msTick(72000000);
   LL_SetSystemCoreClock(72000000);
+
+   /* Update the time base */
+  if (HAL_InitTick (TICK_INT_PRIORITY) != HAL_OK)
+  {
+    Error_Handler();
+  }
 }
 
 /**
